@@ -1,0 +1,62 @@
+version: '3.8'
+
+networks:
+  platform-network:
+
+volumes:
+  platform_db_data:
+    name: platform_db_data
+  platform_redis_data:
+    name: platform_redis_data
+services:
+  redis:
+    container_name: platform-redis
+    image: redis:alpine
+    ports:
+      - 3101:6379
+    networks:
+      - platform-network
+    volumes:
+      - platform_redis_data:/data
+  db:
+    profiles:
+      - "db"
+      - "api"
+    image: 'mongo'
+    container_name: platform-db
+    env_file: .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: $MONGODB_USER
+      MONGO_INITDB_ROOT_PASSWORD: $MONGODB_PASSWORD
+      MONGO_INITDB_DATABASE: $MONGODB_NAME
+    command: mongod --quiet --logpath /dev/null
+    volumes:
+      - platform_db_data:/data/db
+    networks:
+      - platform-network
+  api:
+    profiles:
+      - "api"
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: platform-api
+    env_file: .env
+    ports:
+      - 3100:$PORT
+      - 9229:9229
+    environment:
+      - NODE_ENV=production
+      - PORT=$PORT
+      - MONGODB_USER=$MONGODB_USER
+      - MONGODB_NAME=$MONGODB_NAME
+      - MONGODB_PASSWORD=$MONGODB_PASSWORD
+      - MONGODB_HOST=db
+      - MONGODB_PORT=6379
+    volumes:
+      - ./:/app
+    networks:
+      - platform-network
+    depends_on:
+      - db
+
